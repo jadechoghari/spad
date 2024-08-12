@@ -83,9 +83,13 @@ class SPADAttention(nn.Module):
                 fmask[fmask == 1] = 0
             
             # actually compute the attention, what we cannot get enough of
-            out = xformers.ops.memory_efficient_attention(
-                q, k, v, attn_bias=fmask, op=self.attention_op
-            )
+            # Scaled dot-product attention implementation instead of xformers
+            attn_scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.dim_head)
+            if fmask is not None:
+                attn_scores += fmask
+
+            attn_weights = torch.softmax(attn_scores, dim=-1)
+            out = torch.matmul(attn_weights, v)
 
         out = (
             out.unsqueeze(0)
